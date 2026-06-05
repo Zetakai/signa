@@ -12,3 +12,4 @@ yarn-error.log*
 .vite
 training/.cache_*.npz
 training/.venv
+tsconfig.tsbuildinfo
