@@ -6,9 +6,10 @@ import {
   countByLabel,
   exportSamples,
 } from '../lib/dataset';
-import { trainStaticModel, type TrainProgress } from '../lib/staticModel';
-import { trainDynamicModel } from '../lib/dynamicModel';
+import { trainStaticModel, resetStaticModel, type TrainProgress } from '../lib/staticModel';
+import { trainDynamicModel, resetDynamicModel } from '../lib/dynamicModel';
 import { resampleSequence, DYNAMIC_TIMESTEPS } from '../lib/sequenceBuffer';
+import { getLanguage } from '../lib/languages';
 
 type Kind = 'static' | 'dynamic';
 
@@ -123,6 +124,15 @@ export default function TrainMode({ lang, langName, getLatestVec, setSeqSink, on
     exportSamples(kind, await getAllSamples(kind, lang));
   };
 
+  const onReset = async () => {
+    if (kind === 'static') await resetStaticModel(lang);
+    else await resetDynamicModel(lang);
+    setStatus('Reset to the bundled model (your on-device model removed).');
+    onTrained();
+  };
+
+  const pack = getLanguage(lang);
+  const slotBundled = kind === 'static' ? !!pack.static?.bundled : !!pack.dynamic?.bundled;
   const labelList = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
 
   return (
@@ -130,6 +140,14 @@ export default function TrainMode({ lang, langName, getLatestVec, setSeqSink, on
       <div className="rounded-lg bg-slate-950 px-3 py-2 text-xs text-slate-400">
         Training: <span className="font-medium text-sky-300">{langName}</span>
       </div>
+
+      {slotBundled && (
+        <div className="rounded-lg bg-amber-950 p-3 text-xs text-amber-300">
+          This {kind === 'static' ? 'letters' : 'words'} model is already bundled and ready.
+          Training here <b>replaces it on this device</b> with only what you record — usually
+          unnecessary. Use <b>Reset to default</b> to restore the bundled model.
+        </div>
+      )}
       <div className="flex gap-2">
         {(['static', 'dynamic'] as Kind[]).map((k) => (
           <button
@@ -206,6 +224,14 @@ export default function TrainMode({ lang, langName, getLatestVec, setSeqSink, on
         <button onClick={onClear} className="rounded-lg bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">
           Clear
         </button>
+        {slotBundled && (
+          <button
+            onClick={onReset}
+            className="rounded-lg bg-slate-800 px-3 py-2 text-sm text-amber-300 hover:bg-slate-700"
+          >
+            Reset to default
+          </button>
+        )}
       </div>
 
       <p className="text-xs text-slate-500">

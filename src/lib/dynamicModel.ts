@@ -68,6 +68,16 @@ export function isDynamicReady(): boolean {
   return model !== null && labels.length > 0;
 }
 
+/** Delete the on-device trained dynamic model for a language (restore bundled). */
+export async function resetDynamicModel(lang: string): Promise<void> {
+  try {
+    await tf.io.removeModel(idbUrl(lang));
+  } catch {
+    /* nothing saved */
+  }
+  localStorage.removeItem(labelsKey(lang));
+}
+
 export function dynamicLabels(): string[] {
   return labels;
 }

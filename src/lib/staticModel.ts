@@ -75,6 +75,16 @@ export function isStaticReady(): boolean {
   return model !== null && labels.length > 0;
 }
 
+/** Delete the on-device trained static model for a language (restore bundled). */
+export async function resetStaticModel(lang: string): Promise<void> {
+  try {
+    await tf.io.removeModel(idbUrl(lang));
+  } catch {
+    /* nothing saved */
+  }
+  localStorage.removeItem(labelsKey(lang));
+}
+
 export function staticLabels(): string[] {
   return labels;
 }
