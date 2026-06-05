@@ -36,8 +36,8 @@ export const LANGUAGES: LanguagePack[] = [
   {
     id: 'sibi',
     name: 'SIBI (Bahasa Isyarat Indonesia)',
-    note: 'Letters (A–Z) + words',
-    static: { bundled: false, labels: ALPHABET },
+    note: 'Letters (A–Y, no J/Z) ready • words: train',
+    static: { bundled: true, labels: ALPHABET.filter((l) => l !== 'J' && l !== 'Z') },
     dynamic: { bundled: false },
   },
   {
