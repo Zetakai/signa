@@ -1,0 +1,2 @@
+# Optional: drop a pretrained TF.js dynamic (word) model here.
+# Without it, the app loads a model you train in-app (stored in IndexedDB).

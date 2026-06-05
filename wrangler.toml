@@ -1,0 +1,10 @@
+name = "signa"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "dist"
+
+# Workers AI binding used by functions/smooth.ts.
+# In production set this in the Pages dashboard (Settings -> Functions ->
+# Bindings -> Workers AI, variable name AI). This block enables local
+# `wrangler pages dev`.
+[ai]
+binding = "AI"
