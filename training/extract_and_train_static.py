@@ -45,7 +45,7 @@ def normalize_hand(landmarks):
     return (rel / scale).reshape(-1)  # (63,)
 
 
-def extract_dataset(dataset_dir):
+def extract_dataset(dataset_dir, limit=300, only_letters=True):
     import cv2
     import mediapipe as mp
 
@@ -53,32 +53,36 @@ def extract_dataset(dataset_dir):
         static_image_mode=True, max_num_hands=1, min_detection_confidence=0.5
     )
 
-    X, y = [], []
-    labels = sorted(
+    candidates = sorted(
         d for d in os.listdir(dataset_dir)
         if os.path.isdir(os.path.join(dataset_dir, d))
     )
-    print(f"Labels: {labels}")
+    # Skip non-letter folders like del/nothing/space when only_letters.
+    labels = [d for d in candidates if (not only_letters or (len(d) == 1 and d.isalpha()))]
+    print(f"Labels: {labels}  (limit {limit}/label)")
 
+    X, y = [], []
+    kept_labels = []
     for label in labels:
         folder = os.path.join(dataset_dir, label)
+        files = sorted(os.listdir(folder))[:limit]
         count = 0
-        for fname in os.listdir(folder):
-            path = os.path.join(folder, fname)
-            img = cv2.imread(path)
+        for fname in files:
+            img = cv2.imread(os.path.join(folder, fname))
             if img is None:
                 continue
             res = hands.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             if not res.multi_hand_landmarks:
                 continue
-            vec = normalize_hand(res.multi_hand_landmarks[0].landmark)
-            X.append(vec)
+            X.append(normalize_hand(res.multi_hand_landmarks[0].landmark))
             y.append(label)
             count += 1
-        print(f"  {label}: {count} samples")
+        print(f"  {label}: {count} detected")
+        if count >= 5:
+            kept_labels.append(label)
 
     hands.close()
-    return np.array(X, dtype=np.float32), y, labels
+    return np.array(X, dtype=np.float32), y, kept_labels
 
 
 def train(X, y, labels, epochs):
@@ -87,6 +91,13 @@ def train(X, y, labels, epochs):
     label_index = {l: i for i, l in enumerate(labels)}
     y_idx = np.array([label_index[v] for v in y], dtype=np.int32)
     Y = tf.keras.utils.to_categorical(y_idx, num_classes=len(labels))
+
+    # Shuffle BEFORE the validation split. Keras' validation_split carves off
+    # the tail of the array without shuffling first; the data is grouped by
+    # label, so an unshuffled split validates on only the last few classes.
+    rng = np.random.default_rng(42)
+    perm = rng.permutation(len(X))
+    X, Y = X[perm], Y[perm]
 
     model = tf.keras.Sequential([
         tf.keras.layers.Input(shape=(FEATURES,)),
@@ -107,9 +118,21 @@ def main():
     ap.add_argument("--dataset", required=True, help="root folder, one subdir per label")
     ap.add_argument("--lang", required=True, help="language pack id, e.g. asl / sibi")
     ap.add_argument("--epochs", type=int, default=40)
+    ap.add_argument("--limit", type=int, default=300, help="max images per label")
+    ap.add_argument("--all-folders", action="store_true",
+                    help="include non-letter folders (del/nothing/space)")
     args = ap.parse_args()
 
-    X, y, labels = extract_dataset(args.dataset)
+    cache = os.path.join("training", f".cache_{args.lang}_{args.limit}.npz")
+    if os.path.exists(cache):
+        print(f"Loading cached landmarks from {cache}")
+        d = np.load(cache, allow_pickle=True)
+        X, y, labels = d["X"], list(d["y"]), list(d["labels"])
+    else:
+        X, y, labels = extract_dataset(args.dataset, args.limit, not args.all_folders)
+        np.savez(cache, X=X, y=np.array(y), labels=np.array(labels))
+        print(f"Cached landmarks to {cache}")
+
     if len(X) < len(labels) * 5:
         raise SystemExit("Not enough detected samples (need ~5+ per label).")
 

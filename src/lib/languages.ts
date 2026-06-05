@@ -29,8 +29,8 @@ export const LANGUAGES: LanguagePack[] = [
   {
     id: 'asl',
     name: 'American Sign Language',
-    note: 'Letters (A–Z) + words',
-    static: { bundled: false, labels: ALPHABET },
+    note: 'Letters (A–Z) ready • words: train',
+    static: { bundled: true, labels: ALPHABET },
     dynamic: { bundled: false },
   },
   {

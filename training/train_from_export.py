@@ -65,6 +65,10 @@ def main():
     y_idx = np.array([label_index[s["label"]] for s in samples], dtype=np.int32)
     Y = tf.keras.utils.to_categorical(y_idx, num_classes=len(labels))
 
+    # Shuffle before fit so Keras' tail validation_split isn't all one label.
+    perm = np.random.default_rng(42).permutation(len(data))
+    data, Y = data[perm], Y[perm]
+
     if kind == "static":
         X = data.reshape(-1, FEATURES)
         model = build_static(len(labels))
