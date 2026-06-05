@@ -46,7 +46,7 @@ export default function Transcript({ transcript, onClear, onBackspace }: Props) 
         </div>
       </div>
 
-      <div className="min-h-[3rem] rounded-lg bg-slate-950 p-3 text-lg font-medium">
+      <div className="min-h-[3rem] max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-3 text-lg font-medium">
         {transcript || <span className="text-slate-600">Start signing…</span>}
       </div>
 
@@ -61,7 +61,7 @@ export default function Transcript({ transcript, onClear, onBackspace }: Props) 
       {smoothed !== null && (
         <div className="rounded-lg border border-sky-900 bg-slate-950 p-3">
           <div className="text-xs uppercase tracking-wide text-sky-400">English</div>
-          <div className="mt-1 text-lg">{smoothed}</div>
+          <div className="mt-1 break-words text-lg">{smoothed}</div>
           {offlineNote && (
             <div className="mt-1 text-xs text-amber-500">
               Offline or smoothing unavailable — showing raw gloss.
