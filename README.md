@@ -41,9 +41,25 @@ npm run build
 npx wrangler pages dev dist
 ```
 
-## Train your own signs (no dataset needed)
+## Ready languages (pick and use)
 
-The app ships with **no** pretrained model. Open the **Train** tab:
+These ship with pretrained alphabet models — pick from the dropdown, no
+training needed:
+
+| Language | Letters | Hands | Held-out val acc |
+|---|---|---|---|
+| American Sign Language (ASL) | A–Z | one | ~99% |
+| SIBI (Indonesia) | A–Y (no J/Z) | one | ~96% |
+| BISINDO (Indonesia) | A–Z | two | ~96% |
+
+Word/sentence recognition is not bundled (needs video datasets) — train words
+in-app or via the pipeline. Accuracy above is on each dataset's distribution;
+live webcam varies with lighting/angle. If a letter misfires, capture a few
+samples in Train to fine-tune for your hand.
+
+## Train your own signs (custom / words / new languages)
+
+Open the **Train** tab:
 
 1. **Letters (static):** type a letter, hold the pose, press **Capture** (records a burst). Do ~5 bursts per letter from slightly different angles.
 2. **Words (dynamic):** type a word, press **Record**, perform the gesture, press **Stop**. ~5 recordings per word.
