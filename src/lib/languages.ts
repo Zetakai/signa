@@ -19,6 +19,8 @@ export interface LanguagePack {
   name: string;
   /** Short note shown under the name. */
   note?: string;
+  /** Hands this language uses: 1 (most fingerspelling) or 2 (e.g. BISINDO). */
+  hands: 1 | 2;
   static?: ModelSlot;
   dynamic?: ModelSlot;
 }
@@ -30,6 +32,7 @@ export const LANGUAGES: LanguagePack[] = [
     id: 'asl',
     name: 'American Sign Language',
     note: 'Letters (A–Z) ready • words: train',
+    hands: 1,
     static: { bundled: true, labels: ALPHABET },
     dynamic: { bundled: false },
   },
@@ -37,20 +40,23 @@ export const LANGUAGES: LanguagePack[] = [
     id: 'sibi',
     name: 'SIBI (Bahasa Isyarat Indonesia)',
     note: 'Letters (A–Y, no J/Z) ready • words: train',
+    hands: 1,
     static: { bundled: true, labels: ALPHABET.filter((l) => l !== 'J' && l !== 'Z') },
     dynamic: { bundled: false },
   },
   {
     id: 'bisindo',
-    name: 'BISINDO (Indonesia)',
-    note: 'Letters + words',
-    static: { bundled: false, labels: ALPHABET },
+    name: 'BISINDO (Indonesia, two-handed)',
+    note: 'Letters (A–Z) ready • two-handed • words: train',
+    hands: 2,
+    static: { bundled: true, labels: ALPHABET },
     dynamic: { bundled: false },
   },
   {
     id: 'custom',
     name: 'Custom',
     note: 'Train your own signs',
+    hands: 1,
     static: { bundled: false },
     dynamic: { bundled: false },
   },

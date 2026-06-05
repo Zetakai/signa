@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs';
-import { FEATURES_PER_HAND, type Prediction } from './types';
+import { type Prediction } from './types';
 import { getAllSamples, type Sample } from './dataset';
 import { DYNAMIC_TIMESTEPS } from './sequenceBuffer';
 import { bundledPath, defaultLabels } from './languages';
@@ -75,7 +75,8 @@ export function dynamicLabels(): string[] {
 export function predictDynamic(seq: Float32Array): Prediction | null {
   if (!model || labels.length === 0) return null;
   return tf.tidy(() => {
-    const input = tf.tensor3d(seq, [1, DYNAMIC_TIMESTEPS, FEATURES_PER_HAND]);
+    const featLen = seq.length / DYNAMIC_TIMESTEPS;
+    const input = tf.tensor3d(seq, [1, DYNAMIC_TIMESTEPS, featLen]);
     const logits = model!.predict(input) as tf.Tensor;
     const probs = logits.dataSync();
     let best = 0;
@@ -103,17 +104,18 @@ async function trainFromSamples(
   if (uniqueLabels.length < 2) throw new Error('Need at least 2 different word labels to train.');
   if (samples.length < uniqueLabels.length * 5) throw new Error('Need at least ~5 samples per word.');
 
+  const featLen = samples[0].data.length / DYNAMIC_TIMESTEPS;
   const labelIndex = new Map(uniqueLabels.map((l, i) => [l, i]));
   const flat: number[] = [];
   for (const s of samples) flat.push(...s.data);
-  const xs = tf.tensor3d(flat, [samples.length, DYNAMIC_TIMESTEPS, FEATURES_PER_HAND]);
+  const xs = tf.tensor3d(flat, [samples.length, DYNAMIC_TIMESTEPS, featLen]);
   const ys = tf.oneHot(
     tf.tensor1d(samples.map((s) => labelIndex.get(s.label)!), 'int32'),
     uniqueLabels.length
   );
 
   const net = tf.sequential();
-  net.add(tf.layers.gru({ units: 64, inputShape: [DYNAMIC_TIMESTEPS, FEATURES_PER_HAND], returnSequences: false }));
+  net.add(tf.layers.gru({ units: 64, inputShape: [DYNAMIC_TIMESTEPS, featLen], returnSequences: false }));
   net.add(tf.layers.dropout({ rate: 0.3 }));
   net.add(tf.layers.dense({ units: 32, activation: 'relu' }));
   net.add(tf.layers.dense({ units: uniqueLabels.length, activation: 'softmax' }));

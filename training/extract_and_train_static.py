@@ -36,7 +36,7 @@ FEATURES = NUM_LANDMARKS * 3  # 63
 
 
 def normalize_hand(landmarks):
-    """Match src/lib/normalize.ts: wrist origin + scale by max distance."""
+    """Match src/lib/normalize.ts normalizeHand: wrist origin + scale by max dist."""
     pts = np.array([[lm.x, lm.y, lm.z] for lm in landmarks], dtype=np.float32)
     wrist = pts[0]
     rel = pts - wrist
@@ -45,12 +45,31 @@ def normalize_hand(landmarks):
     return (rel / scale).reshape(-1)  # (63,)
 
 
-def extract_dataset(dataset_dir, limit=300, only_letters=True):
+def build_features_two(multi_hand_landmarks):
+    """Match src/lib/normalize.ts buildFeatures(numHands=2): both hands, SHARED
+    origin/scale, ordered left-to-right by wrist x, missing hand zero-filled."""
+    out = np.zeros(126, dtype=np.float32)
+    hands = [np.array([[lm.x, lm.y, lm.z] for lm in h.landmark], dtype=np.float32)
+             for h in multi_hand_landmarks][:2]
+    if not hands:
+        return out
+    hands.sort(key=lambda h: h[0][0])  # by wrist x
+    origin = hands[0][0]
+    maxd = 1e-6
+    for h in hands:
+        d = np.linalg.norm(h - origin, axis=1).max()
+        maxd = max(maxd, float(d))
+    for i, h in enumerate(hands):
+        out[i * 63:(i + 1) * 63] = ((h - origin) / maxd).reshape(-1)
+    return out
+
+
+def extract_dataset(dataset_dir, limit=300, only_letters=True, num_hands=1):
     import cv2
     import mediapipe as mp
 
     hands = mp.solutions.hands.Hands(
-        static_image_mode=True, max_num_hands=1, min_detection_confidence=0.5
+        static_image_mode=True, max_num_hands=num_hands, min_detection_confidence=0.5
     )
 
     candidates = sorted(
@@ -74,7 +93,11 @@ def extract_dataset(dataset_dir, limit=300, only_letters=True):
             res = hands.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             if not res.multi_hand_landmarks:
                 continue
-            X.append(normalize_hand(res.multi_hand_landmarks[0].landmark))
+            if num_hands == 2:
+                vec = build_features_two(res.multi_hand_landmarks)
+            else:
+                vec = normalize_hand(res.multi_hand_landmarks[0].landmark)
+            X.append(vec)
             y.append(label)
             count += 1
         print(f"  {label}: {count} detected")
@@ -100,7 +123,7 @@ def train(X, y, labels, epochs):
     X, Y = X[perm], Y[perm]
 
     model = tf.keras.Sequential([
-        tf.keras.layers.Input(shape=(FEATURES,)),
+        tf.keras.layers.Input(shape=(X.shape[1],)),  # 63 (one hand) or 126 (two)
         tf.keras.layers.Dense(128, activation="relu"),
         tf.keras.layers.Dropout(0.3),
         tf.keras.layers.Dense(64, activation="relu"),
@@ -119,17 +142,19 @@ def main():
     ap.add_argument("--lang", required=True, help="language pack id, e.g. asl / sibi")
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--limit", type=int, default=300, help="max images per label")
+    ap.add_argument("--hands", type=int, default=1, choices=[1, 2],
+                    help="1 = one-handed (63 feat), 2 = two-handed e.g. BISINDO (126 feat)")
     ap.add_argument("--all-folders", action="store_true",
                     help="include non-letter folders (del/nothing/space)")
     args = ap.parse_args()
 
-    cache = os.path.join("training", f".cache_{args.lang}_{args.limit}.npz")
+    cache = os.path.join("training", f".cache_{args.lang}_{args.limit}_h{args.hands}.npz")
     if os.path.exists(cache):
         print(f"Loading cached landmarks from {cache}")
         d = np.load(cache, allow_pickle=True)
         X, y, labels = d["X"], list(d["y"]), list(d["labels"])
     else:
-        X, y, labels = extract_dataset(args.dataset, args.limit, not args.all_folders)
+        X, y, labels = extract_dataset(args.dataset, args.limit, not args.all_folders, args.hands)
         np.savez(cache, X=X, y=np.array(y), labels=np.array(labels))
         print(f"Cached landmarks to {cache}")
 

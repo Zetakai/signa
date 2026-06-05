@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { startCamera, hasMultipleCameras, type CameraHandle, type Facing } from '../lib/camera';
 import { initHandLandmarker, detect, disposeHandLandmarker } from '../lib/handLandmarker';
-import { normalizeHand } from '../lib/normalize';
+import { buildFeatures } from '../lib/normalize';
 import { drawHands } from '../lib/drawLandmarks';
 import { MotionGate } from '../lib/motionGate';
 import { resampleSequence, DYNAMIC_TIMESTEPS } from '../lib/sequenceBuffer';
@@ -17,7 +17,7 @@ import {
   isDynamicReady,
 } from '../lib/dynamicModel';
 import type { GateState, Prediction } from '../lib/types';
-import { LANGUAGES } from '../lib/languages';
+import { LANGUAGES, getLanguage } from '../lib/languages';
 
 export type EngineStatus = 'idle' | 'loading' | 'running' | 'error';
 
@@ -97,8 +97,8 @@ export function useSignEngine() {
         drawHands(ctx, result.hands, canvas.width, canvas.height, facingRef.current === 'user');
       }
 
-      const hand = result.hands[0];
-      const vec = hand ? normalizeHand(hand) : null;
+      const numHands = getLanguage(langRef.current).hands;
+      const vec = result.hands.length > 0 ? buildFeatures(result.hands, numHands) : null;
       latestVecRef.current = vec;
       seqSinkRef.current?.(vec);
 
@@ -150,7 +150,7 @@ export function useSignEngine() {
     if (cameraRef.current) return;
     patch({ status: 'loading', error: null });
     try {
-      await initHandLandmarker(1);
+      await initHandLandmarker(2);
       const sReady = await loadStaticModel(langRef.current);
       const dReady = await loadDynamicModel(langRef.current);
       const multi = await hasMultipleCameras();

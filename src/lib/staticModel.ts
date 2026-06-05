@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs';
-import { FEATURES_PER_HAND, type Prediction } from './types';
+import { type Prediction } from './types';
 import { getAllSamples, type Sample } from './dataset';
 import { bundledPath, defaultLabels } from './languages';
 
@@ -82,7 +82,7 @@ export function staticLabels(): string[] {
 export function predictStatic(vec: Float32Array): Prediction | null {
   if (!model || labels.length === 0) return null;
   return tf.tidy(() => {
-    const input = tf.tensor2d(vec, [1, FEATURES_PER_HAND]);
+    const input = tf.tensor2d(vec, [1, vec.length]);
     const logits = model!.predict(input) as tf.Tensor;
     const probs = logits.dataSync();
     let best = 0;
@@ -118,15 +118,16 @@ async function trainFromSamples(
   if (uniqueLabels.length < 2) throw new Error('Need at least 2 different labels to train.');
   if (samples.length < uniqueLabels.length * 5) throw new Error('Need at least ~5 samples per label.');
 
+  const featLen = samples[0].data.length; // 63 (one hand) or 126 (two hands)
   const labelIndex = new Map(uniqueLabels.map((l, i) => [l, i]));
-  const xs = tf.tensor2d(samples.map((s) => s.data), [samples.length, FEATURES_PER_HAND]);
+  const xs = tf.tensor2d(samples.map((s) => s.data), [samples.length, featLen]);
   const ys = tf.oneHot(
     tf.tensor1d(samples.map((s) => labelIndex.get(s.label)!), 'int32'),
     uniqueLabels.length
   );
 
   const net = tf.sequential();
-  net.add(tf.layers.dense({ units: 128, activation: 'relu', inputShape: [FEATURES_PER_HAND] }));
+  net.add(tf.layers.dense({ units: 128, activation: 'relu', inputShape: [featLen] }));
   net.add(tf.layers.dropout({ rate: 0.3 }));
   net.add(tf.layers.dense({ units: 64, activation: 'relu' }));
   net.add(tf.layers.dense({ units: uniqueLabels.length, activation: 'softmax' }));
