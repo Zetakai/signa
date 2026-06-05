@@ -17,6 +17,7 @@ import {
   isDynamicReady,
 } from '../lib/dynamicModel';
 import type { GateState, Prediction } from '../lib/types';
+import { LANGUAGES } from '../lib/languages';
 
 export type EngineStatus = 'idle' | 'loading' | 'running' | 'error';
 
@@ -31,6 +32,7 @@ export interface EngineState {
   prediction: Prediction | null;
   transcript: string;
   fps: number;
+  lang: string;
   staticReady: boolean;
   dynamicReady: boolean;
   canSwitchCamera: boolean;
@@ -45,6 +47,7 @@ export function useSignEngine() {
   const builderRef = useRef(new SentenceBuilder());
   const rafRef = useRef<number | null>(null);
   const facingRef = useRef<Facing>('user');
+  const langRef = useRef<string>(LANGUAGES[0].id);
 
   // Detection on/off (Train mode pauses token emission but keeps the loop).
   const detectingRef = useRef(true);
@@ -62,6 +65,7 @@ export function useSignEngine() {
     prediction: null,
     transcript: '',
     fps: 0,
+    lang: LANGUAGES[0].id,
     staticReady: false,
     dynamicReady: false,
     canSwitchCamera: false,
@@ -147,8 +151,8 @@ export function useSignEngine() {
     patch({ status: 'loading', error: null });
     try {
       await initHandLandmarker(1);
-      const sReady = await loadStaticModel();
-      const dReady = await loadDynamicModel();
+      const sReady = await loadStaticModel(langRef.current);
+      const dReady = await loadDynamicModel(langRef.current);
       const multi = await hasMultipleCameras();
 
       const video = videoRef.current!;
@@ -200,10 +204,24 @@ export function useSignEngine() {
 
   /** Refresh model-ready flags after the user trains a new model. */
   const refreshModels = useCallback(async () => {
-    const s = await loadStaticModel();
-    const d = await loadDynamicModel();
+    const s = await loadStaticModel(langRef.current);
+    const d = await loadDynamicModel(langRef.current);
     patch({ staticReady: s && isStaticReady(), dynamicReady: d && isDynamicReady() });
   }, [patch]);
+
+  /** Switch the active language pack and (re)load its models live. */
+  const setLanguage = useCallback(
+    async (lang: string) => {
+      langRef.current = lang;
+      builderRef.current.clear();
+      gateRef.current.reset();
+      patch({ lang, transcript: '', prediction: null });
+      const s = await loadStaticModel(lang);
+      const d = await loadDynamicModel(lang);
+      patch({ staticReady: s && isStaticReady(), dynamicReady: d && isDynamicReady() });
+    },
+    [patch]
+  );
 
   // --- Train-mode capture API ---
   const setDetecting = useCallback((on: boolean) => {
@@ -230,7 +248,8 @@ export function useSignEngine() {
     canvasRef,
     state,
     facingRef,
-    controls: { start, stop, switchCamera, clear, backspace, refreshModels },
+    langRef,
+    controls: { start, stop, switchCamera, clear, backspace, refreshModels, setLanguage },
     capture: { setDetecting, getLatestVec, setSeqSink },
   };
 }

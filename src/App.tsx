@@ -4,6 +4,8 @@ import CameraView from './components/CameraView';
 import PredictionPanel from './components/PredictionPanel';
 import Transcript from './components/Transcript';
 import TrainMode from './components/TrainMode';
+import LanguagePicker from './components/LanguagePicker';
+import { getLanguage } from './lib/languages';
 
 type Tab = 'detect' | 'train';
 
@@ -39,6 +41,13 @@ export default function App() {
           ))}
         </div>
       </header>
+
+      <LanguagePicker
+        lang={state.lang}
+        staticReady={state.staticReady}
+        dynamicReady={state.dynamicReady}
+        onChange={controls.setLanguage}
+      />
 
       <CameraView videoRef={videoRef} canvasRef={canvasRef} mirror={facingRef.current === 'user'} />
 
@@ -100,6 +109,8 @@ export default function App() {
 
       {running && tab === 'train' && (
         <TrainMode
+          lang={state.lang}
+          langName={getLanguage(state.lang).name}
           getLatestVec={capture.getLatestVec}
           setSeqSink={capture.setSeqSink}
           onTrained={controls.refreshModels}

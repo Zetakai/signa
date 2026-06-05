@@ -13,6 +13,8 @@ import { resampleSequence, DYNAMIC_TIMESTEPS } from '../lib/sequenceBuffer';
 type Kind = 'static' | 'dynamic';
 
 interface Props {
+  lang: string;
+  langName: string;
   getLatestVec: () => Float32Array | null;
   setSeqSink: (sink: ((vec: Float32Array | null) => void) | null) => void;
   onTrained: () => void;
@@ -20,7 +22,7 @@ interface Props {
 
 const STATIC_BURST = 25; // frames captured per static sample press
 
-export default function TrainMode({ getLatestVec, setSeqSink, onTrained }: Props) {
+export default function TrainMode({ lang, langName, getLatestVec, setSeqSink, onTrained }: Props) {
   const [kind, setKind] = useState<Kind>('static');
   const [label, setLabel] = useState('');
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -31,13 +33,13 @@ export default function TrainMode({ getLatestVec, setSeqSink, onTrained }: Props
   const recBuffer = useRef<Float32Array[]>([]);
 
   const refreshCounts = async (k: Kind) => {
-    setCounts(countByLabel(await getAllSamples(k)));
+    setCounts(countByLabel(await getAllSamples(k, lang)));
   };
 
   useEffect(() => {
     refreshCounts(kind);
     setProgress(null);
-  }, [kind]);
+  }, [kind, lang]);
 
   // --- Static capture: burst of frames ---
   const captureStatic = async () => {
@@ -50,7 +52,7 @@ export default function TrainMode({ getLatestVec, setSeqSink, onTrained }: Props
       const id = setInterval(async () => {
         const vec = getLatestVec();
         if (vec && vec.some((v) => v !== 0)) {
-          await addSample('static', { label: l, data: Array.from(vec) });
+          await addSample('static', { lang, label: l, data: Array.from(vec) });
           n++;
         }
         if (n >= STATIC_BURST) {
@@ -84,7 +86,7 @@ export default function TrainMode({ getLatestVec, setSeqSink, onTrained }: Props
         return;
       }
       const seq = resampleSequence(frames, DYNAMIC_TIMESTEPS);
-      addSample('dynamic', { label: l, data: Array.from(seq) }).then(() => {
+      addSample('dynamic', { lang, label: l, data: Array.from(seq) }).then(() => {
         setStatus(`Saved 1 sequence for "${l}" (${frames.length} frames).`);
         refreshCounts('dynamic');
       });
@@ -101,8 +103,8 @@ export default function TrainMode({ getLatestVec, setSeqSink, onTrained }: Props
       const onProg = (p: TrainProgress) => setProgress(p);
       const labels =
         kind === 'static'
-          ? await trainStaticModel(40, onProg)
-          : await trainDynamicModel(60, onProg);
+          ? await trainStaticModel(lang, 40, onProg)
+          : await trainDynamicModel(lang, 60, onProg);
       setStatus(`Trained on ${labels.length} labels: ${labels.join(', ')}`);
       onTrained();
     } catch (err) {
@@ -112,19 +114,22 @@ export default function TrainMode({ getLatestVec, setSeqSink, onTrained }: Props
   };
 
   const onClear = async () => {
-    await clearSamples(kind);
+    await clearSamples(kind, lang);
     await refreshCounts(kind);
     setStatus('Cleared samples.');
   };
 
   const onExport = async () => {
-    exportSamples(kind, await getAllSamples(kind));
+    exportSamples(kind, await getAllSamples(kind, lang));
   };
 
   const labelList = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
 
   return (
     <div className="space-y-4 rounded-xl bg-slate-900 p-4">
+      <div className="rounded-lg bg-slate-950 px-3 py-2 text-xs text-slate-400">
+        Training: <span className="font-medium text-sky-300">{langName}</span>
+      </div>
       <div className="flex gap-2">
         {(['static', 'dynamic'] as Kind[]).map((k) => (
           <button

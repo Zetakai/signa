@@ -9,6 +9,7 @@ const STORE_DYNAMIC = 'dynamic-samples';
 
 export interface Sample {
   id?: number;
+  lang: string; // language pack id this sample belongs to
   label: string;
   data: number[]; // flattened features
 }
@@ -45,7 +46,11 @@ export async function addSample(kind: 'static' | 'dynamic', sample: Sample): Pro
   db.close();
 }
 
-export async function getAllSamples(kind: 'static' | 'dynamic'): Promise<Sample[]> {
+/** Get samples for a kind, optionally filtered to one language pack. */
+export async function getAllSamples(
+  kind: 'static' | 'dynamic',
+  lang?: string
+): Promise<Sample[]> {
   const db = await openDB();
   const samples = await new Promise<Sample[]>((resolve, reject) => {
     const tx = db.transaction(storeName(kind), 'readonly');
@@ -54,10 +59,25 @@ export async function getAllSamples(kind: 'static' | 'dynamic'): Promise<Sample[
     req.onerror = () => reject(req.error);
   });
   db.close();
-  return samples;
+  return lang ? samples.filter((s) => s.lang === lang) : samples;
 }
 
-export async function clearSamples(kind: 'static' | 'dynamic'): Promise<void> {
+/** Clear samples for a kind. If `lang` given, only that language's samples. */
+export async function clearSamples(kind: 'static' | 'dynamic', lang?: string): Promise<void> {
+  if (lang) {
+    const remaining = (await getAllSamples(kind)).filter((s) => s.lang !== lang);
+    const db = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(storeName(kind), 'readwrite');
+      const store = tx.objectStore(storeName(kind));
+      store.clear();
+      for (const s of remaining) store.add({ lang: s.lang, label: s.label, data: s.data });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    return;
+  }
   const db = await openDB();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(storeName(kind), 'readwrite');
